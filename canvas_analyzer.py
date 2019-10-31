@@ -17,7 +17,8 @@ __version__ = 7
 
 # 1) main
 import canvas_requests
-import matplotlib.pyplot
+import matplotlib.pyplot as plt
+import datetime
 def main(user_name):
     user = canvas_requests.get_user(user_name)
     print_user_info(user)
@@ -30,7 +31,7 @@ def main(user_name):
     summarize_points(submissions)
     summarize_groups(submissions)
     plot_scores(submissions)
-    #plot_grade_trends(submissions)
+    plot_grade_trends(submissions)
 
 
 # 2) print_user_info
@@ -55,7 +56,7 @@ def filter_available_courses(courses: [dict])->[dict]:
 # 4) print_courses
 def print_courses(courses: [dict])->str:
     for course in courses:
-        print(courses["id"] + " : " + courses["Name"])
+        print("\t", course["id"], ":", course["name"])
 
 
 # 5) get_course_ids
@@ -76,17 +77,17 @@ def choose_course(numbers: [int])->int:
     return value
 # 7) summarize_points
 def summarize_points(submissions: [dict]):
-    poss = 0
+    possible = 0
     score = 0
     for submission in submissions:
         if submission["score"] is not None:
-            points_possible += submission["assignment"]["points_possible"]
-            group_weight = submission["assignment"]["group"]["group weight"]
-            poss += points_possible * group_weight
+            points_possible = submission["assignment"]["points_possible"]
+            group_weight = submission["assignment"]["group"]["group_weight"]
+            possible += points_possible * group_weight
             score += submission["score"] * group_weight
-    print("Points possible so far: " + poss)
-    print("Points obtained: " + score)
-    print("Current grade: " + round(100 * score/poss))
+    print("Points possible so far: " , possible)
+    print("Points obtained: " , score)
+    print("Current grade: " , round(100 * score/possible))
 
 
 
@@ -119,6 +120,11 @@ def plot_scores(submissions: [dict]):
     plt.ylabel("Number of Assignments")
     plt.show()
 
+def parse_date(date):
+    return datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
+
+
+
 # 10) plot_grade_trends
 def plot_grade_trends(submissions):
     weighted_score = 0
@@ -127,7 +133,35 @@ def plot_grade_trends(submissions):
     running_low = []
     running_high = []
     running_max = []
-
+    for submission in submissions:
+        weighted_modifier = submission["assignment"]["group"]["group_weight"]
+        score = 0
+        if submission["score"]:
+            score = submission["score"]
+        weighted_score += score * weighted_modifier
+        points_possible = submission["assignment"]["points_possible"]
+        if not submission["graded_at"]:
+            ungraded_max += points_possible * weighted_modifier
+        else:
+            ungraded_max += score * weighted_modifier
+        max_weighted_score += points_possible * weighted_modifier
+        running_low.append(100 * weighted_score)
+        running_max.append(100 * max_weighted_score)
+        running_high.append(100 * ungraded_max)
+    print(running_max)
+    print(max_weighted_score)
+    running_high = [s / max_weighted_score for s in running_high]
+    running_low = [s / max_weighted_score for s in running_low]
+    running_max = [s / max_weighted_score for s in running_max]
+    running_dates = []
+    for submission in submissions:
+        running_dates.append(parse_date(submission["assignment"]["due_at"]))
+    plt.plot(running_dates, running_high, label="Highest", linestyle="--")
+    plt.plot(running_dates, running_low, label="Lowest", linestyle="--")
+    plt.plot(running_dates, running_max, label="Maximum")
+    plt.title("Grade Trend")
+    plt.ylabel("Grade")
+    plt.show()
 
 
 
